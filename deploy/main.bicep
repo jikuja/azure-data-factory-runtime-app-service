@@ -10,6 +10,12 @@ param vnetName string = 'shirdemo'
 @description('The name of the data factory to create. This must be globally unique.')
 param dataFactoryName string = 'shirdemo${uniqueString(resourceGroup().id)}'
 
+@description('The port for nodes remote access.')
+param irNodeRemoteAccessPort int = 8060
+
+@description('The expiration time of the offline nodes in seconds. The value should not be less than 600.')
+param irNodeExpirationTime int = 600
+
 @description('The name of the SKU to use when creating the virtual machine.')
 param vmSize string = 'Standard_DS1_v2'
 
@@ -127,8 +133,12 @@ module aci 'modules/aci.bicep' = {
               value: 'true'
             }
             {
+              name: 'HA_PORT'
+              value: irNodeRemoteAccessPort
+            }
+            {
               name: 'AE_TIME'
-              value: '601'
+              value: irNodeExpirationTime
             }
             {
               name: 'ENABLE_HA'
