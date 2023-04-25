@@ -76,7 +76,18 @@ module adf 'modules/data-factory.bicep' = {
   }
 }
 
-// Deploy a Data Factory pipeline to connect to the private web server on the VM.
+// Deploy ADF globals
+module dataFactoryGlobals 'modules/data-factory-globals.bicep' = {
+  name: 'adf-globals'
+  params: {
+    aciId: aci.outputs.resourceId
+    adfName: dataFactoryName
+  }
+}
+
+// Deploy a Data Factory pipelines:
+// * to start ACI
+// * to connect to the private web server on the VM.
 module dataFactoryPipeline 'modules/data-factory-pipeline.bicep' = {
   name: 'adf-pipeline'
   params: {
