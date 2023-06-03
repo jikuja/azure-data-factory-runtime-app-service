@@ -109,7 +109,11 @@ Implementation will be easier as soon as Bicep allows passing resources to/from 
 
 ## Note
 
-In this sample, we use App Service to host the container because the other serverless/PaaS container hosting options in Azure don't support VNet integration with Windows containers (at least at the time of writing, June 2022).
+In this sample, we use ACI to host the container because the other serverless/PaaS container hosting options in Azure don't support or support has limitations VNet integration with Windows containers (at least at the time of writing, June 2023).
+
+App service is not really serverless: it is generating costs 24/7 as soon as `Microsoft.Web/serverfarms` is being deployed. Official app service [demo](https://github.com/Azure-Samples/azure-data-factory-runtime-app-service)
+
+TODO: comments about AKS. New free tier allows running small Kubbernetes cluster with 24/7 cluster management cost. [(Released 02/2023)](https://techcommunity.microsoft.com/t5/apps-on-azure-blog/azure-kubernetes-service-free-tier-and-standard-tier/ba-p/3731432)
 
 ## TODO
 
