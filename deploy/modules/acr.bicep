@@ -44,3 +44,6 @@ resource buildTask 'Microsoft.ContainerRegistry/registries/taskRuns@2019-06-01-p
 output containerRegistryName string = containerRegistry.name
 output containerImageName string = containerImageName
 output containerImageTag string = containerImageTag
+output loginServer string = containerRegistry.properties.loginServer
+output username string = containerRegistry.listCredentials().username
+output password string = containerRegistry.listCredentials().passwords[0].value

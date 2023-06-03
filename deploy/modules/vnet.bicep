@@ -16,8 +16,12 @@ param dataFactorySubnetAddressPrefix string = '10.0.1.0/24'
 @description('The address prefix of the subnet for the virtual machine with the private web server.')
 param vmSubnetAddressPrefix string = '10.0.2.0/24'
 
+@description('The address prefix of the subnet for ACI.')
+param aciSubnetAddressPrefix string = '10.0.3.0/24'
+
 var appOutboundSubnetName = 'app-outbound'
 var dataFactorySubnetName = 'data-factory'
+var aciSubnetName = 'aci'
 var vmSubnetName = 'vm'
 
 resource virtualNetwork 'Microsoft.Network/virtualNetworks@2021-08-01' = {
@@ -62,6 +66,20 @@ resource virtualNetwork 'Microsoft.Network/virtualNetworks@2021-08-01' = {
           addressPrefix: vmSubnetAddressPrefix
         }
       }
+      {
+        name: aciSubnetName
+        properties: {
+          addressPrefix: aciSubnetAddressPrefix
+          delegations: [
+            {
+              name: 'aci'
+              properties: {
+                serviceName: 'Microsoft.ContainerInstance/containerGroups'
+              }
+            }
+          ]
+        }
+      }
     ]
   }
 
@@ -76,6 +94,10 @@ resource virtualNetwork 'Microsoft.Network/virtualNetworks@2021-08-01' = {
   resource vmSubnet 'subnets' existing = {
     name: vmSubnetName
   }
+
+  resource aciSubnet 'subnets' existing = {
+    name: aciSubnetName
+  }
 }
 
 output virtualNetworkName string = virtualNetwork.name
@@ -85,3 +107,5 @@ output appOutboundSubnetResourceId string = virtualNetwork::appOutboundSubnet.id
 output dataFactorySubnetResourceId string = virtualNetwork::dataFactorySubnet.id
 
 output vmSubnetResourceId string = virtualNetwork::vmSubnet.id
+
+output aciSubnetResourceId string = virtualNetwork::aciSubnet.id

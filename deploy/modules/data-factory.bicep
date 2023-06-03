@@ -91,3 +91,5 @@ resource privateDnsZoneLinkToVNet 'Microsoft.Network/privateDnsZones/virtualNetw
 output dataFactoryName string = dataFactory.name
 
 output integrationRuntimeName string = integrationRuntimeName
+
+output irKey string = integrationRuntime.listAuthKeys().authKey1

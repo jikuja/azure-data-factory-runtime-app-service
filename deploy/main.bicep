@@ -10,15 +10,6 @@ param vnetName string = 'shirdemo'
 @description('The name of the data factory to create. This must be globally unique.')
 param dataFactoryName string = 'shirdemo${uniqueString(resourceGroup().id)}'
 
-@description('The name of the App Service application to create. This must be globally unique.')
-param appName string = 'app-${uniqueString(resourceGroup().id)}'
-
-@description('The SKU of the App Service plan to run the self-hosted integration runtime container.')
-param appServicePlanSku object = {
-  name: 'P2v3'
-  capacity: 1
-}
-
 @description('The name of the SKU to use when creating the virtual machine.')
 param vmSize string = 'Standard_DS1_v2'
 
@@ -31,6 +22,9 @@ param vmAdminUsername string = 'shirdemoadmin'
 @description('The administrator password to use for the virtual machine.')
 @secure()
 param vmAdminPassword string
+
+@description('The name of ACI to create. This must be globally unique.')
+param aciName string = 'shir${uniqueString(resourceGroup().id)}'
 
 // Deploy the container registry and build the container image.
 module acr 'modules/acr.bicep' = {
@@ -92,28 +86,87 @@ module dataFactoryPipeline 'modules/data-factory-pipeline.bicep' = {
   }
 }
 
-// Deploy Application Insights, which the App Service app uses.
-module applicationInsights 'modules/application-insights.bicep' = {
-  name: 'application-insights'
+
+var image = '${acr.outputs.containerRegistryName}.azurecr.io/${acr.outputs.containerImageName}:${acr.outputs.containerImageTag}'
+
+// TODO: how to deploy without assigning ports twice?
+module aci 'modules/aci.bicep' = {
+  name: 'aci'
   params: {
+    name: aciName
     location: location
+    // Fails if enabled: 'Managed service identity is not supported for Windows container groups.'
+    systemAssignedIdentity: false
+    containers: [
+      {
+        name: '1'
+        properties: {
+          command: []
+          environmentVariables: [
+            {
+              name: 'AUTH_KEY'
+              secureValue: adf.outputs.irKey
+            }
+            {
+              name: 'NODE_NAME'
+              value: 'demonode'
+            }
+            {
+              name: 'ENABLE_AE'
+              value: 'true'
+            }
+            {
+              name: 'AE_TIME'
+              value: '601'
+            }
+            {
+              name: 'ENABLE_HA'
+              value: 'true'
+            }
+          ]
+          image: image
+          ports: [
+            {
+              port: 80
+              protocol: 'Tcp'
+            }
+            {
+              port: 443
+              protocol: 'Tcp'
+            }
+          ]
+          resources: {
+            requests: {
+              cpu: 4
+              memoryInGB: 8
+            }
+          }
+        }
+      }
+    ]
+    ipAddressType: 'Private'
+    subnetId: vnet.outputs.aciSubnetResourceId
+    ipAddressPorts: [
+      {
+        port: 80
+        protocol: 'Tcp'
+      }
+      {
+        port: 443
+        protocol: 'Tcp'
+      }
+    ]
+    osType: 'Windows'
+    restartPolicy: 'OnFailure'
+    sku: 'Standard'
+    // No support for MSI, service principal requires too much work for being demo
+    imageRegistryCredentials: [
+      {
+        server: acr.outputs.loginServer
+        username: acr.outputs.username
+        password: acr.outputs.password
+      }
+    ]
   }
 }
 
-// Deploy the App Service app resources and deploy the container image from the container registry.
-module app 'modules/app.bicep' = {
-  name: 'app'
-  params: {
-    location: location
-    appName: appName
-    appOutboundSubnetResourceId: vnet.outputs.appOutboundSubnetResourceId
-    applicationInsightsInstrumentationKey: applicationInsights.outputs.instrumentationKey
-    applicationInsightsConnectionString: applicationInsights.outputs.connectionString
-    containerRegistryName: acr.outputs.containerRegistryName
-    containerImageName: acr.outputs.containerImageName
-    containerImageTag: acr.outputs.containerImageTag
-    dataFactoryName: adf.outputs.dataFactoryName
-    dataFactoryIntegrationRuntimeName: adf.outputs.integrationRuntimeName
-    appServicePlanSku: appServicePlanSku
-  }
-}
