@@ -114,4 +114,4 @@ In this sample, we use App Service to host the container because the other serve
 ## TODO
 
 * Test if ACI can pull images through a VNet-integrated container registry
-* 
+* Refactor templating when Bicep support resources as module inputs and outputs
