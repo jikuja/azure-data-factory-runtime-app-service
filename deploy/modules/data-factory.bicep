@@ -18,6 +18,9 @@ var privateDnsZoneName = 'privatelink.datafactory.azure.net'
 resource dataFactory 'Microsoft.DataFactory/factories@2018-06-01' = {
   name: dataFactoryName
   location: location
+  identity: {
+    type: 'SystemAssigned'
+  }
   properties: {
     publicNetworkAccess: 'Disabled'
   }
@@ -93,3 +96,5 @@ output dataFactoryName string = dataFactory.name
 output integrationRuntimeName string = integrationRuntimeName
 
 output irKey string = integrationRuntime.listAuthKeys().authKey1
+
+output msiId string = dataFactory.identity.principalId

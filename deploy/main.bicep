@@ -170,3 +170,16 @@ module aci 'modules/aci.bicep' = {
   }
 }
 
+
+module adfRoleAssignments 'modules/data-factory-role-assingments.bicep' = {
+  name: 'adfRoleAssignments'
+  params: {
+    aciName:  aciName
+    adfMsiId: adf.outputs.msiId
+    adfName: dataFactoryName
+  }
+  dependsOn: [
+    adf
+    aci
+  ]
+}
