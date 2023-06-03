@@ -1,16 +1,24 @@
-# Azure Data Factory self-hosted integration runtime on App Service
+> :warning: :warning: :warning: :warning: :warning:
+> 
+> Before deploying this to any public or multi-user environment please read [Security](#Security) section.
 
-This sample illustrates how to host an [Azure Data Factory self-hosted integration runtime](https://docs.microsoft.com/azure/data-factory/concepts-integration-runtime) in Azure App Service.
+# Azure Data Factory self-hosted integration runtime in Azure Container Instances(ACI) service
 
-By using this approach, you can gain the benefits of using a self-hosted integration runtime while avoiding having to manage virtual machines or other infrastructure.
+This sample illustrates how to host an [Azure Data Factory self-hosted integration runtime](https://docs.microsoft.com/azure/data-factory/concepts-integration-runtime) in Azure Container Instances service.
+
+By using this approach, you can gain the benefits of 
+* using a self-hosted integration runtime while avoiding having to manage virtual machines or other infrastructure
+* orchestrating ACI up and down when needed
 
 ## Approach and architecture
 
-This sample runs the self-hosted integration in a Windows container on App Service. Azure Data Factory [supports running a self-hosted integration runtime on Windows containers](https://docs.microsoft.com/azure/data-factory/how-to-run-self-hosted-integration-runtime-in-windows-container), and [they provide a GitHub repository](https://github.com/Azure/Azure-Data-Factory-Integration-Runtime-in-Windows-Container) with a Dockerfile and associated scripts. Azure Container Registry builds the Dockerfile by using [ACR tasks](https://docs.microsoft.com/azure/container-registry/container-registry-tasks-overview).
+This sample runs the self-hosted integration in a Windows container on ACI. Azure Data Factory [supports running a self-hosted integration runtime on Windows containers](https://docs.microsoft.com/azure/data-factory/how-to-run-self-hosted-integration-runtime-in-windows-container), and [they provide a GitHub repository](https://github.com/Azure/Azure-Data-Factory-Integration-Runtime-in-Windows-Container) with a Dockerfile and associated scripts. Azure Container Registry builds the Dockerfile by using [ACR tasks](https://docs.microsoft.com/azure/container-registry/container-registry-tasks-overview).
 
-The App Service container app uses [VNet integration](https://docs.microsoft.com/azure/app-service/overview-vnet-integration) to connect to a virtual network. This means that the self-hosted integration runtime can [connect to Data Factory by using a private endpoint](https://docs.microsoft.com/azure/data-factory/data-factory-private-link), and it can also access servers and other resources that are accessible thorugh the virtual network.
+The ACI uses [VNet integration](https://learn.microsoft.com/en-us/azure/container-instances/container-instances-vnet) to connect to a virtual network. This means that the self-hosted integration runtime can [connect to Data Factory by using a private endpoint](https://docs.microsoft.com/azure/data-factory/data-factory-private-link), and it can also access servers and other resources that are accessible thorugh the virtual network.
 
-To illustrate the end-to-end flow, the sample deploys an example Data Factory pipeline that connects to a web server on a virtual machine by using a private IP address.
+To illustrate the end-to-end flow, the sample deploys an example Data Factory pipelines which
+* starts ACI and polls integration runtime(IR) status until IR is available 
+* connects to a web server on a virtual machine by using a private IP address.
 
 ### Architecture diagram
 
@@ -18,9 +26,8 @@ To illustrate the end-to-end flow, the sample deploys an example Data Factory pi
 
 These are the data flows used by the solution:
 
-1. When the app starts, App Service pulls the container image from the container registry.
-    - The app uses a managed identity to pull the container image from the container registry. However, App Service requires that the `DOCKER_REGISTRY_SERVER_*` settings are in the app's settings.
-    - [App Service doesn't support](https://azure.github.io/AppService/2021/07/03/Linux-container-from-ACR-with-private-endpoint.html#:~:text=Windows%20containers%20do%20not%20support%20pulling%20images%20over%20virtual%20network%20integration) pulling a Windows container image through a VNet-integrated container registry.
+1. When the ACI starts, ACI pulls the container image from the container registry.
+    - The ACI ACR's admin credentials to pull the image. This has been selected to simplify the demo.
 1. After the container is started, the self-hosted integration runtime loads. It connects to the data factory by using a private endpoint.
 1. When the data factory's pipeline runs, the self-hosted integration runtime accesses the web server on the virtual machine.
 
@@ -57,10 +64,54 @@ To test the deployment when it's completed:
 1. Select **Open Azure Data Factory Studio**. A separate page opens up in your browser.
 1. On the left navigation bar, select **Manage**, and then select **Integration runtimes**. Look at the **self-hosted-runtime** item. The status should show as *Available*. If it says *Unavailable*, it probably means the container is still starting. Wait a few minutes and refresh the list.
 1. On the left navigation bar, select **Author**.
+1. TODO: refactor text for multiple pipelines:
+  1. Under **Pipelines**, select **Start ACI**.
 1. Under **Pipelines**, select **sample-pipeline**. The pipeline opens. There's a single task named *GetWebContent*.
 1. On the toolbar, select **Debug** to start the pipeline running. The run appears in the bottom pane. Wait a few moments and select the refresh button on the bottom pane's toolbar.
 1. The task shows the *Succeeded* status. This means the self-hosted integration runtime successfully connected to the web server on the virtual machine and accessed its data.
 
+## Security
+
+To simplify templating sensitive data is passed as module output values and in unsecured Bicep module inputs:
+* Integration runtime key
+* ACI admin username and password
+
+To simplify templating ACI admin username and password are used instead instead of service principal:
+* Linux container on ACI [support](https://learn.microsoft.com/en-us/azure/container-instances/using-azure-container-registry-mi)  ACI with MSI. Windows containers do not support MSI at all
+* The recommended alternative login credentials for ACI is service principal:
+  * [ACI documentation](https://learn.microsoft.com/en-us/azure/container-instances/container-instances-using-azure-container-registry)
+  * [ACR documentation](https://learn.microsoft.com/en-us/azure/container-registry/container-registry-auth-service-principal)
+  * Conflicting [ACR documentation](https://learn.microsoft.com/en-us/azure/container-registry/container-registry-auth-aci) mentions usage of service principals only for ACI
+
+Because of the template simplifications Azure deployment resource(s) will contain credentials on their outputs and therefore this template should not be used for production deployments.
+
+### Proposed changes
+
+To fix above-mentioned security related issues main.bicep and aci.bicep require some major refactoring.
+
+**Template refactoring**
+Templates should be refactored not to
+* return sensitive data as module outputs
+* not to pass sensitve data to unsecured module inputs
+
+**ACI/ACR**
+ACI/ACR has two potential fixes:
+* Use recommended credential to pull images
+  * service principals. This required refactoring to avoid unsecured module inputs
+  * or wait for proper MSI support
+
+Alternative approach is to continue using ACI admin username and password and refactor template not to pass credentials as module output and as unsecured module input.
+
+**ACI/ADF IR key**
+This can be implemented with template refactoring. 
+
+Implementation will be easier as soon as Bicep allows passing resources to/from modules.
+
 ## Note
 
 In this sample, we use App Service to host the container because the other serverless/PaaS container hosting options in Azure don't support VNet integration with Windows containers (at least at the time of writing, June 2022).
+
+## TODO
+
+* Test if ACI can pull images through a VNet-integrated container registry
+* 
