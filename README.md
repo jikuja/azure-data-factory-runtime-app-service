@@ -102,6 +102,8 @@ ACI/ACR has two potential fixes:
 
 Alternative approach is to continue using ACI admin username and password and refactor template not to pass credentials as module output and as unsecured module input.
 
+Other alternative approach is to use [repository-scoped tokens](https://learn.microsoft.com/en-gb/azure/container-registry/container-registry-repository-scoped-permissions) with ACI
+
 **ACI/ADF IR key**
 This can be implemented with template refactoring. 
 
